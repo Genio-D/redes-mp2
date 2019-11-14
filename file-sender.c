@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <netdb.h>
 #include "packet-format.h"
 
 int main(int argc, char ** argv) {
@@ -18,8 +19,8 @@ int main(int argc, char ** argv) {
 
     char *filepath = argv[1];
     char *host_name = argv[2];
-    int port = argv[3];
-    int window_size = argv[4];
+    int port = atoi(argv[3]);
+    int window_size = atoi(argv[4]);
 
     host = gethostbyname(host_name);
 
