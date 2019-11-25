@@ -10,7 +10,10 @@
 #include <netdb.h>
 #include "packet-format.h"
 
+#define CHUNK_SIZE 1000
+
 int main(int argc, char ** argv) {
+	int client_socket;
     struct sockaddr_in server_addr;
 	int conversion_status;
 	int connection_status;
@@ -21,6 +24,20 @@ int main(int argc, char ** argv) {
     char *host_name = argv[2];
     int port = atoi(argv[3]);
     int window_size = atoi(argv[4]);
+
+	data_pkt_t data_pkt;
+    ack_pkt_t ack_pkt;
+
+	if(argc != 5) {
+        printf("Wrong number of arguments.\nUsage: {filepath} {address} {port} {windowsize}\n");
+        exit(-1);
+    }
+
+	client_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(client_socket == -1) {
+		fprintf(stderr, "socket: Error\n");
+		exit(-1);
+	}
 
     host = gethostbyname(host_name);
 
