@@ -16,17 +16,17 @@ int main(int argc, char ** argv) {
 	int client_socket;
     struct sockaddr_in server_addr;
 	int conversion_status;
-	int connection_status;
 	struct hostent *host;
 	struct in_addr **addr_list;
 
-    char *filepath = argv[1];
+    // char *filepath = argv[1];
     char *host_name = argv[2];
     int port = atoi(argv[3]);
+	/*
     int window_size = atoi(argv[4]);
 
 	data_pkt_t data_pkt;
-    ack_pkt_t ack_pkt;
+    ack_pkt_t ack_pkt;*/
 
 	if(argc != 5) {
         printf("Wrong number of arguments.\nUsage: {filepath} {address} {port} {windowsize}\n");
