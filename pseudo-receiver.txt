@@ -39,9 +39,7 @@ move_window(stored_packets)
         if stored_packets[index] == NULL
             break
         increment += 1
-        stored_packets.pop()
-        stored.push(False)
-
+        stored_packets.shift_left()
     return increment
 
 check_end(stored_packets, last_packet_received)
