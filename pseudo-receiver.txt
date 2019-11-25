@@ -12,7 +12,7 @@ receiver(file, expected_size, window_size)
 
         seq_num = packet.getSeq()
         if seq_num between window_start and window_end
-            store(stored_packets, packet, window_size)
+            store(stored_packets, packet, window_start)
             file_write(log, seq_num, packet.getData())
             send_ack(seq_num)
             if seq_num == window_start
@@ -21,9 +21,9 @@ receiver(file, expected_size, window_size)
                 window_end += increment
             check_end(stored_packets, last_packet_received)
 
-store(stored_packets, seq_num, window_size)
+store(stored_packets, seq_num, window_start)
 // If its not already stored, set it as stored
-    index = window_size % seq_num - 1
+    index = seq_num - window_start
     if not stored_packets[index]
         stored_packets.push(True)
 
