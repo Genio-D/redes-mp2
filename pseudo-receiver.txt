@@ -1,0 +1,54 @@
+receiver(file, expected_size, window_size)
+// expected_size = expected packet data size
+    window_start = 0
+    window_end = window_size
+    stored_packets = []
+    last_packet_received = False
+
+    while True
+        packet = receive(socket)
+        if packet.getSize() < expected_size
+            last_packet_received = True
+
+        seq_num = packet.getSeq()
+        if seq_num between window_start and window_end
+            store(stored_packets, packet, window_size)
+            file_write(log, seq_num, packet.getData())
+            send_ack(seq_num)
+            if seq_num == window_start
+                increment = move_window(stored_packets)
+                window_start += increment
+                window_end += increment
+            check_end(stored_packets, last_packet_received)
+
+store(stored_packets, seq_num, window_size)
+// If its not already stored, set it as stored
+    index = window_size % seq_num - 1
+    if not stored_packets[index]
+        stored_packets.push(True)
+
+file_write(log, seq_num, data)
+    offset = (seq_num - 1) * 1000 \\ char
+    fseek(log, offset, SEEK_SET)
+    fputs(data, log)
+
+
+move_window(stored_packets)
+    increment = 0
+    for each index in stored_packets
+        if stored_packets[index] == NULL
+            break
+        increment += 1
+        stored_packets.pop()
+        stored.push(False)
+
+    return increment
+
+check_end(stored_packets, last_packet_received)
+    if(last_packet_received)
+        for each boolean in stored_packets
+            if boolean == True
+                return False
+        return True
+    else
+        return False
