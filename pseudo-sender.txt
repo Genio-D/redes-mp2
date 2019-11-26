@@ -10,7 +10,7 @@ sender(socket, file, window_size)
 
         for each index in received_acks
             if not received_acks[index]
-                send_packet(socket, file, index)
+                send_packet(socket, file, index, window_start)
         ack_num = store_acks(socket, received_acks, window_start)
         
         if ack_num == empty
@@ -23,13 +23,13 @@ sender(socket, file, window_size)
         window_start += increment
         window_end += increment
 
-send_packet(socket, file, index)
-    offset = (index - 1) * 1000 \\ char
+send_packet(socket, file, index, window_start)
+    seq_num = index + window_start
+    offset = (seq_num - 1) * 1000 \\ char
     fseek(file, offset, SEEK_SET)
     message = fgets(file, 1000)
 
     packet = Packet()
-    seq_num = index + window_start
     packet.setSeq(seq_num)
     packet.setData(message)
     send(socket, packet)
