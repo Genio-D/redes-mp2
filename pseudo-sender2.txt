@@ -1,0 +1,46 @@
+// One packet at a time
+
+sender(socket, file)
+    number_chunks = find_number_chunks(file, 1000)
+    chunk = 0
+    received_acks = [False] * number_chunks
+    num_acks = 0
+    timeout = 1
+    while num_acks < number_chunks
+        select(io_fd, timeout)
+
+        if socket_fd has message
+            get_ack(socket, received_acks)
+            num_acks += 1
+            chunk += 1
+        else
+            send_packet(socket, file, chunk)
+
+find_number_chunks(file, chunk_size)
+    file_size = find_file_size(file)
+    return file_size / chunk_size
+
+find_file_size(file)
+    num_bytes = 0
+    for each char in file
+        num_bytes += 1
+    return num_bytes
+
+get_ack(socket)
+    ack_num = recv(socket)
+    received_acks[ack_num] = True
+
+send_packet(socket, file, chunk)
+    message = get_message(file, chunk)
+    packet = make_packet()
+    send(socket, packet)
+
+get_message(file, chunk)
+    offset = chunk * 1000 \\ char
+    fseek(file, offset, SEEK_SET)
+    return fgets(file, 1000)
+
+make_packet(chunk, message)
+    packet = Packet()
+    packet.setSeq(chunk + 1)
+    packet.setData(message)
