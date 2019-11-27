@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <netdb.h>
 #include "packet-format.h"
-#include <sys/select.h>
 #include <assert.h>
 #include <errno.h>
 
@@ -70,13 +69,13 @@ void free_packet(data_pkt_t *packet) {
 	free(packet);
 }
 
-data_pkt_t *make_packet(int chunk, char *message) {
+data_pkt_t *make_packet(int chunk, char *message, int chunk_size) {
 	data_pkt_t *packet = (data_pkt_t *) malloc(sizeof(data_pkt_t)); 
 	assert(packet);
 	assert(message);
 
-	strcpy(packet->data, message);
 	packet->seq_num = chunk;
+	strncpy(packet->data, message, chunk_size);
 	return packet;
 }
 
@@ -84,21 +83,20 @@ void get_message(FILE *file, int chunk, int chunk_size, char *message) {
 	assert(file);
 	assert(message);
 
-	int offset = chunk * 100;
+	int offset = chunk * chunk_size;
 	fseek(file, offset, SEEK_SET);
-	int read = fread(message, 1, chunk_size, file);
 
-	if (read == 0)
-	{
-		perror("fread error");
+	for(int i = 0; i < chunk_size; i++) {
+		message[i] = fgetc(file);
 	}
+	message[chunk_size] = '\0'; 
 }
 
 void send_packet(int socket, FILE *file, int chunk, int chunk_size) {
-	char message[chunk_size];
+	char message[chunk_size + 1];
 	get_message(file, chunk, chunk_size, message);
 
-	data_pkt_t *packet = make_packet(chunk, message);
+	data_pkt_t *packet = make_packet(chunk, message, chunk_size);
 	send(socket, packet, sizeof(packet), 0);
 	free_packet(packet);
 }
