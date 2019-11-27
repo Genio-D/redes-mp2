@@ -11,12 +11,14 @@
 #include "packet-format.h"
 #include <assert.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #define BUFFER_SIZE 4096
 #define CHUNK_SIZE 1000
 #define TRUE 1
 #define FALSE 0
 
+struct sockaddr_in server_addr;
 
 int open_socket(char *host_name, int port) {
 	int client_socket;
@@ -97,27 +99,37 @@ void send_packet(int socket, FILE *file, int chunk, int chunk_size) {
 	get_message(file, chunk, chunk_size, message);
 
 	data_pkt_t *packet = make_packet(chunk, message, chunk_size);
-	send(socket, packet, sizeof(packet), 0);
+	printf("sending message with length %lu:\n%s\n", strlen(packet->data), packet->data);
+	printf("sending seq_num = %d", packet->seq_num);
+	send(socket, packet, sizeof(data_pkt_t), 0);
 	free_packet(packet);
 }
 
-void get_ack(int socket, int *received_acks) {
+void get_ack(int socket, int *received_acks, int *numacks) {
 	assert(received_acks);
 
-	ack_pkt_t *receiver_ack;
-	int len = recv(socket, &receiver_ack, sizeof(ack_pkt_t), 0);
-	
+	ack_pkt_t *receiver_ack = (ack_pkt_t *) malloc(sizeof(ack_pkt_t)); 
+
+	printf("waiting for ack\n");
+	int len = recv(socket, receiver_ack, sizeof(ack_pkt_t), 0);
 	if(len == -1) {
 		if(errno == EAGAIN){
-			printf("TIMEOUT");
+			printf("TIMEOUT\n");
+			return;
 		}
 		else {
 			perror("socket recv error");
 			exit(-1);
 		}
 	}
+	printf("got out of recv\n");
+	fflush(stdout);
+	printf("got ack %d", receiver_ack->seq_num);
+	fflush(stdout);
 	int ack_num = receiver_ack->seq_num;
+	*numacks = ack_num;
 	received_acks[ack_num] = TRUE;
+	free(receiver_ack);
 }
 
 int *received_acks_array(int number_chunks) {
@@ -166,8 +178,8 @@ void sender(int socket, FILE *file, int chunk_size) {
 	while(num_acks < number_chunks) {
 		send_packet(socket, file, chunk, chunk_size);
 		printf("packet %d sent\n", chunk);
-		get_ack(socket, received_acks);
-		printf("ack received\n");
+		get_ack(socket, received_acks, &num_acks);
+		printf("ack maybe received\n");
 	}
 }
 
@@ -180,6 +192,15 @@ int main(int argc, char ** argv) {
 	char *host_name = argv[2];
     int port = atoi(argv[3]);
 	int socket = open_socket(host_name, port);
+
+	struct timeval tv = {1, 0}; /*1 second*/
+
+	int ret = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &tv,
+		sizeof(struct timeval));
+	if(ret < 0) {
+		perror("setsockopt err");
+		exit(-1);
+	}
 
 	char *filepath = argv[1];
 	FILE *file = fopen(filepath, "r");
