@@ -85,35 +85,35 @@ void get_message(FILE *file, int chunk, int chunk_size, char *message) {
 
 	int offset = chunk * 100;
 	fseek(file, offset, SEEK_SET);
-	fread(message, 1, chunk_size, file);
+	int read = fread(message, 1, chunk_size, file);
+
+	if (read == 0)
+	{
+		perror("fread error");
+	}
 }
 
 void send_packet(int socket, FILE *file, int chunk, int chunk_size) {
 	char message[chunk_size];
 	get_message(file, chunk, chunk_size, message);
 	
-	strcpy(message, "ola");
-
 	data_pkt_t *packet = make_packet(chunk, message);
-	send(socket, packet->data, sizeof(packet), 0);
+	send(socket, packet, sizeof(packet), 0);
 	free_packet(packet);
 }
 
 void get_ack(int socket, int *received_acks) {
 	assert(received_acks);
 
-	char server_response[BUFFER_SIZE];
-	int len = recv(socket, &server_response, BUFFER_SIZE, 0);
+	ack_pkt_t *receiver_ack;
+	int len = recv(socket, &receiver_ack, sizeof(ack_pkt_t), 0);
 	
 	if(len == -1) {
 		perror("socket recv error");
 		exit(-1);
 	}
 
-	server_response[len] = '\0';
-	printf("message: %s\n", server_response);
-	
-	int ack_num = atoi(server_response);
+	int ack_num = receiver_ack->seq_num;
 	received_acks[ack_num] = TRUE;
 }
 
@@ -160,10 +160,11 @@ void sender(int socket, FILE *file, int chunk_size) {
 	int *received_acks = received_acks_array(number_chunks);
 	int num_acks = 0;
 
-
 	while(num_acks < number_chunks) {
 		send_packet(socket, file, chunk, chunk_size);
+		printf("packet %d sent\n", chunk);
 		get_ack(socket, received_acks);
+		printf("ack received\n");
 	}
 }
 

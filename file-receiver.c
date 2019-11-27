@@ -14,7 +14,6 @@
 
 
 int move_window(int *packets, int windowsize) {
-    printf("in store");
     int i, j;
     for(i = 0; i < windowsize; i++) {
         if(packets[0] == 0)
@@ -26,10 +25,6 @@ int move_window(int *packets, int windowsize) {
     return i;
 }
 
-void store(int *packets, int seq, int windowsize) {
-    int i = seq - windowsize;
-    packets[i] = 1;
-}
 
 void file_write(FILE *fd, int seq_num, char *data) {
     int offset = (seq_num - 1) * CHUNK_SIZE;
@@ -57,7 +52,7 @@ int main(int argc, char ** argv) {
     int window_size = atoi(argv[3]);
 
     int listen_fd;
-    struct sockaddr_in serverSocket/*, clientSocket*/;
+    struct sockaddr_in serverSocket;
 	serverSocket.sin_family = AF_INET;
 	serverSocket.sin_port = htons(port);
 	serverSocket.sin_addr.s_addr = INADDR_ANY;
@@ -75,7 +70,6 @@ int main(int argc, char ** argv) {
         exit(-1);
     }
 
-    /*int clientSocket_len = sizeof(clientSocket);*/
 
     listen_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (listen_fd == -1)
@@ -93,8 +87,7 @@ int main(int argc, char ** argv) {
         packets[i] = 0;
 
     while(1) {
-        /*int recv_len = recvfrom(listen_fd, &data_pkt, sizeof(data_pkt), 0,\
-        (struct sockaddr *) &clientSocket, (struct socklen_t *) &clientSocket_len);*/
+
         int recv_len = read(listen_fd, &data_pkt, sizeof(data_pkt));
         if(recv_len == -1) {
             printf("read error");
@@ -106,9 +99,8 @@ int main(int argc, char ** argv) {
         int seq = data_pkt.seq_num;
         ack_pkt.seq_num = seq + 1;
         if(seq >= window_start && seq <= window_end) {
-            store(packets, seq, window_start);
+            packets[seq - window_start] = 1;
             file_write(result_file, seq, data_pkt.data);
-            /*sendto(listen_fd, &ack_pkt, recv_len, 0, (struct sockaddr *) &clientSocket, clientSocket_len);*/
             if(write(listen_fd, &ack_pkt, recv_len) == -1) {
                 printf("write error");
                 exit(-1);
