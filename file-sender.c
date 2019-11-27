@@ -96,7 +96,7 @@ void get_message(FILE *file, int chunk, int chunk_size, char *message) {
 void send_packet(int socket, FILE *file, int chunk, int chunk_size) {
 	char message[chunk_size];
 	get_message(file, chunk, chunk_size, message);
-	
+
 	data_pkt_t *packet = make_packet(chunk, message);
 	send(socket, packet, sizeof(packet), 0);
 	free_packet(packet);
