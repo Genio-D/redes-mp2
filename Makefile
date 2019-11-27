@@ -1,4 +1,4 @@
-TARGETS = file-sender file-receiver
+TARGETS = file-receiver 
 
 CC = gcc
 CFLAGS = -Wall -Werror -O3
