@@ -11,6 +11,7 @@
 #include "packet-format.h"
 #include <sys/select.h>
 #include <assert.h>
+#include <errno.h>
 
 #define BUFFER_SIZE 4096
 #define CHUNK_SIZE 1000
@@ -109,10 +110,14 @@ void get_ack(int socket, int *received_acks) {
 	int len = recv(socket, &receiver_ack, sizeof(ack_pkt_t), 0);
 	
 	if(len == -1) {
-		perror("socket recv error");
-		exit(-1);
+		if(errno == EAGAIN){
+			printf("TIMEOUT");
+		}
+		else {
+			perror("socket recv error");
+			exit(-1);
+		}
 	}
-
 	int ack_num = receiver_ack->seq_num;
 	received_acks[ack_num] = TRUE;
 }
