@@ -74,7 +74,6 @@ data_pkt_t *make_packet(int chunk, char *message, int chunk_size) {
 	data_pkt_t *packet = (data_pkt_t *) malloc(sizeof(data_pkt_t)); 
 	assert(packet);
 	assert(message);
-
 	packet->seq_num = chunk;
 	strncpy(packet->data, message, chunk_size);
 	return packet;
@@ -90,20 +89,35 @@ void get_message(FILE *file, int chunk, int chunk_size, char *message) {
 	printf("read %d bytes\n", ret);
 }
 
-void send_packet(int socket, FILE *file, int chunk, int chunk_size) {
-	char message[chunk_size];
-	get_message(file, chunk, chunk_size, message);
-
-	data_pkt_t *packet = make_packet(chunk, message, chunk_size);
-
-	printf("sending seq_num = %d\n", packet->seq_num);
-	int ret = send(socket, packet, sizeof(data_pkt_t), 0);
-	printf("sent %d bytes\n", ret);
-	free_packet(packet);
+int move_window(int *packets, int windowsize) {
+    int i, j;
+    for(i = 0; i < windowsize; i++) {
+        if(packets[0] == 0)
+            break;
+        for(j = 0; j < windowsize; j++)
+            packets[j] = packets[j + 1];
+        packets[windowsize - 1] = 0;
+    }
+    return i;
 }
 
-void get_ack(int socket, int *received_acks, int *numacks, int *chunk, int *timeout) {
-	assert(received_acks);
+void send_packet(int socket, FILE *file, int chunk_size, int windowstart, int windowend) {
+	char message[chunk_size];
+
+	for(; windowstart <= windowend; windowstart++) {
+		memset(message, '\0', chunk_size);
+		get_message(file, windowstart, chunk_size, message);
+		data_pkt_t *packet = make_packet(windowstart, message, chunk_size);
+		printf("sending seq_num = %d\n", packet->seq_num);
+		int ret = send(socket, packet, sizeof(data_pkt_t), 0);
+		printf("sent %d bytes\n", ret);
+		free_packet(packet);
+	}
+
+}
+
+void get_ack(int socket, int *numacks, int *window,
+	int *windowstart, int *windowend, int windowsize, int *timeout) {
 
 	ack_pkt_t *receiver_ack = (ack_pkt_t *) malloc(sizeof(ack_pkt_t)); 
 
@@ -127,34 +141,21 @@ void get_ack(int socket, int *received_acks, int *numacks, int *chunk, int *time
 	printf("got ack %d\n", receiver_ack->seq_num);
 	*timeout = 0;
 	int ack_num = receiver_ack->seq_num;
-	*numacks = ack_num;
-	*chunk = ack_num;
-	received_acks[ack_num] = TRUE;
+	window[ack_num - *windowstart - 1] = 1;
+	*numacks += 1;
+	int increment = move_window(window, windowsize);
+	*windowstart += increment;
+	*windowend += increment;
+
 	free(receiver_ack);
 }
 
-int *received_acks_array(int number_chunks) {
-	int *array = (int *) malloc(sizeof(int) * number_chunks);
-	for(int i = 0; i < number_chunks; i++) {
-		array[i] = FALSE;
-	}
-	return array;
-}
-
-int find_file_size(FILE *file) {
-	assert(file);
-
-	int num_bytes = 0;
-	while(fgetc(file) != EOF ) {
-		num_bytes += 1;
-	}
-	return num_bytes;
-}
 
 int find_number_chunks(FILE *file, int chunk_size) {
 	assert(file);
 
-	int file_size = find_file_size(file);
+	fseek(file, 0, SEEK_END);
+	int file_size = ftell(file);
 	int q = file_size / chunk_size;
 	int r = file_size % chunk_size;
 
@@ -168,19 +169,24 @@ int find_number_chunks(FILE *file, int chunk_size) {
 	}
 }
 
-void sender(int socket, FILE *file, int chunk_size) {
+void sender(int socket, FILE *file, int chunk_size, int window_size) {
 	assert(file);
 
 	int number_chunks = find_number_chunks(file, chunk_size);
-	int chunk = 0;
-	int *received_acks = received_acks_array(number_chunks);
 	int num_acks = 0;
 	int timeout = 0;
+	int window[window_size];
+	int window_start = 0;
+	int window_end = window_size - 1;
+	int i;
+
+	for(i = 0; i < window_size; i++)
+		window[i] = 0;
 
 	while(num_acks < number_chunks) {
-		send_packet(socket, file, chunk, chunk_size);
-		printf("packet %d sent\n", chunk);
-		get_ack(socket, received_acks, &num_acks, &chunk, &timeout);
+		send_packet(socket, file, chunk_size, window_start, window_end);
+		printf("packets sent: from %d to %d\n", window_start, window_end);
+		get_ack(socket, &num_acks, window, &window_start, &window_end, window_size, &timeout);
 	}
 }
 
@@ -204,10 +210,10 @@ int main(int argc, char ** argv) {
 	}
 
 	char *filepath = argv[1];
-	FILE *file = fopen(filepath, "r");
-	// int window_size = atoi(argv[4]);
+	FILE *file = fopen(filepath, "rb");
+	int window_size = atoi(argv[4]);
 
-	sender(socket, file, CHUNK_SIZE);
+	sender(socket, file, CHUNK_SIZE, window_size);
 
 	fclose(file);
 }

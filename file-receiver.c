@@ -31,7 +31,8 @@ void file_write(FILE *fd, int seq_num, char *data) {
     int offset = seq_num * CHUNK_SIZE;
     printf("writing message at position %d\n", offset);
     fseek(fd, offset, SEEK_SET);
-    fputs(data, fd);
+    /*fputs(data, fd);*/
+    fwrite(data, 1, strlen(data), fd);
 }
 
 int check_end(int *packets, int last_packet_received, int windowsize) {
@@ -67,7 +68,7 @@ int main(int argc, char ** argv) {
     FILE *result_file;
     int i;
 
-    result_file = fopen(result_filepath, "w+");
+    result_file = fopen(result_filepath, "w+b");
 
     if(argc != 4) {
         printf("Wrong number of arguments.\nUsage: {filepath} {port} {windowsize}\n");
@@ -76,11 +77,14 @@ int main(int argc, char ** argv) {
 
 
     listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (listen_fd == -1)
+    if (listen_fd == -1) {
+        printf("failed to create socket\n");
         exit(-1);
-
-    if(bind(listen_fd, (struct sockaddr *)&serverSocket, sizeof(serverSocket)) < 0)
+    }
+    if(bind(listen_fd, (struct sockaddr *)&serverSocket, sizeof(serverSocket)) < 0) {
+        printf("failed to bind socket\n");
 		exit(-1);
+    }
 
     int window_start = 0;
     int window_end = window_size;
@@ -91,7 +95,6 @@ int main(int argc, char ** argv) {
         packets[i] = 0;
 
     while(1) {
-        printf("current window_start = %d\n", window_start);
         printf("waiting to receive data pkt\n");
         fflush(stdout);
         socklen_t clientSocket_len;
@@ -103,7 +106,8 @@ int main(int argc, char ** argv) {
             printf("read error");
             exit(-1);
         }
-        printf("got %lu bytes in packet data\n", strlen(data_pkt->data));
+        printf("got %lu characters in packet data\n", strlen(data_pkt->data));
+        printf("got %lu bytes in packet data\n", sizeof(data_pkt->data));
         if(strlen(data_pkt->data) < CHUNK_SIZE)
             last_packet_received = 1;
         
@@ -117,7 +121,6 @@ int main(int argc, char ** argv) {
             file_write(result_file, seq, data_pkt->data);
             printf("sending ack\n");
 
-            /*sleep(2);*/
             int val = sendto(listen_fd, ack_pkt, sizeof(ack_pkt_t), 0,
                 (struct sockaddr *) &clientSocket, clientSocket_len);
             if(val == -1) {
