@@ -29,8 +29,7 @@ int move_window(int *packets, int windowsize) {
 
 void file_write(FILE *fd, int seq_num, char *data) {
     int offset = seq_num * CHUNK_SIZE;
-    printf("writing message:\n%s\nat position %d\n", data, offset);
-    fflush(stdout);
+    printf("writing message at position %d\n", offset);
     fseek(fd, offset, SEEK_SET);
     fputs(data, fd);
 }
@@ -110,22 +109,22 @@ int main(int argc, char ** argv) {
         
         int seq = data_pkt->seq_num;
         printf("got data pkt seq = %d\n", seq);
-        fflush(stdout);
+
         ack_pkt->seq_num = seq + 1;
         ack_pkt->selective_acks = 0;
         if(seq >= window_start && seq <= window_end) {
             packets[seq - window_start] = 1;
             file_write(result_file, seq, data_pkt->data);
             printf("sending ack\n");
-            fflush(stdout);
+
+            /*sleep(2);*/
             int val = sendto(listen_fd, ack_pkt, sizeof(ack_pkt_t), 0,
                 (struct sockaddr *) &clientSocket, clientSocket_len);
             if(val == -1) {
                 perror("bad send\n");
                 exit(-1);
             }
-            printf("sent %d bytes\n", val);
-            fflush(stdout);
+
             if(seq == window_start) {
                 int increment = move_window(packets, window_size);
                 window_start += increment;

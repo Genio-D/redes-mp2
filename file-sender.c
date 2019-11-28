@@ -18,7 +18,6 @@
 #define TRUE 1
 #define FALSE 0
 
-struct sockaddr_in server_addr;
 
 int open_socket(char *host_name, int port) {
 	int client_socket;
@@ -84,28 +83,26 @@ data_pkt_t *make_packet(int chunk, char *message, int chunk_size) {
 void get_message(FILE *file, int chunk, int chunk_size, char *message) {
 	assert(file);
 	assert(message);
-
+	memset(message, '\0', chunk_size);
 	int offset = chunk * chunk_size;
 	fseek(file, offset, SEEK_SET);
-
-	for(int i = 0; i < chunk_size; i++) {
-		message[i] = fgetc(file);
-	}
-	message[chunk_size] = '\0'; 
+	int ret = fread(message, 1, 1000, file);
+	printf("read %d bytes\n", ret);
 }
 
 void send_packet(int socket, FILE *file, int chunk, int chunk_size) {
-	char message[chunk_size + 1];
+	char message[chunk_size];
 	get_message(file, chunk, chunk_size, message);
 
 	data_pkt_t *packet = make_packet(chunk, message, chunk_size);
-	printf("sending message with length %lu:\n%s\n", strlen(packet->data), packet->data);
-	printf("sending seq_num = %d", packet->seq_num);
-	send(socket, packet, sizeof(data_pkt_t), 0);
+
+	printf("sending seq_num = %d\n", packet->seq_num);
+	int ret = send(socket, packet, sizeof(data_pkt_t), 0);
+	printf("sent %d bytes\n", ret);
 	free_packet(packet);
 }
 
-void get_ack(int socket, int *received_acks, int *numacks) {
+void get_ack(int socket, int *received_acks, int *numacks, int *chunk, int *timeout) {
 	assert(received_acks);
 
 	ack_pkt_t *receiver_ack = (ack_pkt_t *) malloc(sizeof(ack_pkt_t)); 
@@ -115,6 +112,11 @@ void get_ack(int socket, int *received_acks, int *numacks) {
 	if(len == -1) {
 		if(errno == EAGAIN){
 			printf("TIMEOUT\n");
+			*timeout += 1;
+			if(*timeout == 3) {
+				printf("3 timeouts in a row, exiting\n");
+				exit(-1);
+			}
 			return;
 		}
 		else {
@@ -122,12 +124,11 @@ void get_ack(int socket, int *received_acks, int *numacks) {
 			exit(-1);
 		}
 	}
-	printf("got out of recv\n");
-	fflush(stdout);
-	printf("got ack %d", receiver_ack->seq_num);
-	fflush(stdout);
+	printf("got ack %d\n", receiver_ack->seq_num);
+	*timeout = 0;
 	int ack_num = receiver_ack->seq_num;
 	*numacks = ack_num;
+	*chunk = ack_num;
 	received_acks[ack_num] = TRUE;
 	free(receiver_ack);
 }
@@ -174,12 +175,12 @@ void sender(int socket, FILE *file, int chunk_size) {
 	int chunk = 0;
 	int *received_acks = received_acks_array(number_chunks);
 	int num_acks = 0;
+	int timeout = 0;
 
 	while(num_acks < number_chunks) {
 		send_packet(socket, file, chunk, chunk_size);
 		printf("packet %d sent\n", chunk);
-		get_ack(socket, received_acks, &num_acks);
-		printf("ack maybe received\n");
+		get_ack(socket, received_acks, &num_acks, &chunk, &timeout);
 	}
 }
 
