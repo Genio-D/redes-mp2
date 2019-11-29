@@ -31,7 +31,8 @@ void file_write(FILE *fd, int seq_num, char *data, int len) {
     int offset = seq_num * CHUNK_SIZE;
     printf("writing message at position %d\n", offset);
     fseek(fd, offset, SEEK_SET);
-    fwrite(data, 1, len, fd);
+    int ret = fwrite(data, 1, len, fd);
+    printf("wrote %d bytes\n", ret);
 }
 
 int check_end(int *packets, int last_packet_received, int windowsize) {
@@ -74,12 +75,24 @@ int main(int argc, char ** argv) {
         exit(-1);
     }
 
-
     listen_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (listen_fd == -1) {
         printf("failed to create socket\n");
         exit(-1);
     }
+    int enable = 1;
+    int ret = setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&enable,
+		sizeof(enable));
+	if(ret < 0) {
+		perror("setsockopt err");
+		exit(-1);
+	}
+    ret = setsockopt(listen_fd, SOL_SOCKET, SO_REUSEPORT, (const char*)&enable,
+		sizeof(enable));
+	if(ret < 0) {
+		perror("setsockopt err");
+		exit(-1);
+	}
     if(bind(listen_fd, (struct sockaddr *)&serverSocket, sizeof(serverSocket)) < 0) {
         printf("failed to bind socket\n");
 		exit(-1);
@@ -106,11 +119,10 @@ int main(int argc, char ** argv) {
             printf("read error");
             exit(-1);
         }
-        printf("received %d bytes\n", recv_len);
-        printf("got %lu characters in packet data\n", strlen(data_pkt->data));
-        printf("got %lu bytes in packet data\n", sizeof(data_pkt->data));
+        int len = recv_len - sizeof(uint32_t);
+        printf("received %d bytes\n", len);
         
-        if(recv_len - sizeof(uint32_t) < CHUNK_SIZE)
+        if(len < CHUNK_SIZE)
             last_packet_received = 1;
         
         int seq = data_pkt->seq_num;
@@ -120,7 +132,7 @@ int main(int argc, char ** argv) {
         ack_pkt->selective_acks = 0;
         if(seq >= window_start && seq <= window_end) {
             packets[seq - window_start] = 1;
-            file_write(result_file, seq, data_pkt->data, recv_len);
+            file_write(result_file, seq, data_pkt->data, len);
             printf("sending ack\n");
 
             int val = sendto(listen_fd, ack_pkt, sizeof(ack_pkt_t), 0,

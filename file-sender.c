@@ -18,10 +18,11 @@
 #define TRUE 1
 #define FALSE 0
 
+struct sockaddr_in server_addr;
+socklen_t s_len;
 
 int open_socket(char *host_name, int port) {
 	int client_socket;
-	struct sockaddr_in server_addr;
 	int conversion_status;
 	int connection_status;
 	struct hostent *host;
@@ -113,7 +114,8 @@ void send_packet(int socket, FILE *file, int chunk_size, int windowstart, int wi
 		printf("sending seq_num = %d\n", packet->seq_num);
 		// printf("sizeof packet data = %lu", sizeof(packet->data));
 		printf("strlen of packet data = %lu\n", strlen(packet->data));
-		int val = send(socket, packet, sizeof(char) * ret + sizeof(uint32_t), 0);
+		int val = sendto(socket, packet, sizeof(char) * ret + sizeof(uint32_t), 0,
+			(struct sockaddr *) &server_addr, s_len);
 		printf("sent %d bytes\n", val);
 		free_packet(packet);
 	}
@@ -126,7 +128,8 @@ void get_ack(int socket, int *numacks, int *window,
 	ack_pkt_t *receiver_ack = (ack_pkt_t *) malloc(sizeof(ack_pkt_t)); 
 
 	printf("waiting for ack\n");
-	int len = recv(socket, receiver_ack, sizeof(ack_pkt_t), 0);
+	int len = recvfrom(socket, receiver_ack, sizeof(ack_pkt_t), 0,
+		(struct sockaddr *) &server_addr, &s_len);
 	if(len == -1) {
 		if(errno == EAGAIN){
 			printf("TIMEOUT\n");
@@ -213,6 +216,7 @@ int main(int argc, char ** argv) {
 		exit(-1);
 	}
 
+	s_len = sizeof(server_addr);
 	char *filepath = argv[1];
 	FILE *file = fopen(filepath, "rb");
 	int window_size = atoi(argv[4]);

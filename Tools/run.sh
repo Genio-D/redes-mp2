@@ -14,7 +14,7 @@ sleep .1
 
 LD_PRELOAD="./log-packets.so" \
     PACKET_LOG="sender-packets.log" \
-    DROP_PATTERN="01" \
+    DROP_PATTERN="" \
     ./file-sender send.dat localhost 1234 1
 
 wait $RECEIVER_PID || true
