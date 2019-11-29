@@ -19,6 +19,6 @@ LD_PRELOAD="./log-packets.so" \
 
 wait $RECEIVER_PID || true
 
-diff -s send.dat receive.dat
+cmp send.dat receive.dat
 
 ./generate-msc.sh msc.eps sender-packets.log receiver-packets.log

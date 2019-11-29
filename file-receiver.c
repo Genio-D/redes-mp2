@@ -35,18 +35,6 @@ void file_write(FILE *fd, int seq_num, char *data, int len) {
     printf("wrote %d bytes\n", ret);
 }
 
-int check_end(int *packets, int last_packet_received, int windowsize) {
-    int i;
-    if(last_packet_received) {
-        for(i = 0; i < windowsize; i++) {
-            if(packets[i] == 1)
-                return 0;
-        }
-        return 1;
-    }
-    else
-        return 0;
-}
 
 int main(int argc, char ** argv) {
 
@@ -107,24 +95,28 @@ int main(int argc, char ** argv) {
         packets[i] = 0;
 
     while(1) {
+        if(last_packet_received){
+            printf("reached end, closing stuff\n");
+            break;
+        }
         printf("waiting to receive data pkt\n");
         fflush(stdout);
         socklen_t clientSocket_len;
         clientSocket_len = sizeof(clientSocket);
 
-        memset(data_pkt->data, '\0', CHUNK_SIZE);
+        // memset(data_pkt->data, '\0', CHUNK_SIZE);
         int recv_len = recvfrom(listen_fd, data_pkt, sizeof(data_pkt_t), 0,
             (struct sockaddr *) &clientSocket, &clientSocket_len);
         if(recv_len == -1) {
             printf("read error");
             exit(-1);
         }
-        int len = recv_len - sizeof(uint32_t);
-        printf("received %d bytes\n", len);
-        
-        if(len < CHUNK_SIZE)
+        int len = recv_len - sizeof(data_pkt->seq_num);
+        printf("received %d bytes\n", recv_len);
+        // printf("pkt data:\n_____\n%s\n_____\n", data_pkt->data);
+        if(len < CHUNK_SIZE) {
             last_packet_received = 1;
-        
+        }
         int seq = data_pkt->seq_num;
         printf("got data pkt seq = %d\n", seq);
 
@@ -147,8 +139,6 @@ int main(int argc, char ** argv) {
                 window_start += increment;
                 window_end += increment;
             }
-            if(check_end(packets, last_packet_received, window_size))
-                break;
         }
     }
     fclose(result_file);
