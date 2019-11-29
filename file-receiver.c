@@ -27,12 +27,11 @@ int move_window(int *packets, int windowsize) {
 }
 
 
-void file_write(FILE *fd, int seq_num, char *data) {
+void file_write(FILE *fd, int seq_num, char *data, int len) {
     int offset = seq_num * CHUNK_SIZE;
     printf("writing message at position %d\n", offset);
     fseek(fd, offset, SEEK_SET);
-    /*fputs(data, fd);*/
-    fwrite(data, 1, strlen(data), fd);
+    fwrite(data, 1, len, fd);
 }
 
 int check_end(int *packets, int last_packet_received, int windowsize) {
@@ -100,15 +99,18 @@ int main(int argc, char ** argv) {
         socklen_t clientSocket_len;
         clientSocket_len = sizeof(clientSocket);
 
+        memset(data_pkt->data, '\0', CHUNK_SIZE);
         int recv_len = recvfrom(listen_fd, data_pkt, sizeof(data_pkt_t), 0,
             (struct sockaddr *) &clientSocket, &clientSocket_len);
         if(recv_len == -1) {
             printf("read error");
             exit(-1);
         }
+        printf("received %d bytes\n", recv_len);
         printf("got %lu characters in packet data\n", strlen(data_pkt->data));
         printf("got %lu bytes in packet data\n", sizeof(data_pkt->data));
-        if(strlen(data_pkt->data) < CHUNK_SIZE)
+        
+        if(recv_len - sizeof(uint32_t) < CHUNK_SIZE)
             last_packet_received = 1;
         
         int seq = data_pkt->seq_num;
@@ -118,7 +120,7 @@ int main(int argc, char ** argv) {
         ack_pkt->selective_acks = 0;
         if(seq >= window_start && seq <= window_end) {
             packets[seq - window_start] = 1;
-            file_write(result_file, seq, data_pkt->data);
+            file_write(result_file, seq, data_pkt->data, recv_len);
             printf("sending ack\n");
 
             int val = sendto(listen_fd, ack_pkt, sizeof(ack_pkt_t), 0,

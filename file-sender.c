@@ -79,7 +79,7 @@ data_pkt_t *make_packet(int chunk, char *message, int chunk_size) {
 	return packet;
 }
 
-void get_message(FILE *file, int chunk, int chunk_size, char *message) {
+int get_message(FILE *file, int chunk, int chunk_size, char *message) {
 	assert(file);
 	assert(message);
 	memset(message, '\0', chunk_size);
@@ -87,6 +87,7 @@ void get_message(FILE *file, int chunk, int chunk_size, char *message) {
 	fseek(file, offset, SEEK_SET);
 	int ret = fread(message, 1, 1000, file);
 	printf("read %d bytes\n", ret);
+	return ret;
 }
 
 int move_window(int *packets, int windowsize) {
@@ -103,14 +104,17 @@ int move_window(int *packets, int windowsize) {
 
 void send_packet(int socket, FILE *file, int chunk_size, int windowstart, int windowend) {
 	char message[chunk_size];
+	int ret;
 
 	for(; windowstart <= windowend; windowstart++) {
 		memset(message, '\0', chunk_size);
-		get_message(file, windowstart, chunk_size, message);
+		ret = get_message(file, windowstart, chunk_size, message);
 		data_pkt_t *packet = make_packet(windowstart, message, chunk_size);
 		printf("sending seq_num = %d\n", packet->seq_num);
-		int ret = send(socket, packet, sizeof(data_pkt_t), 0);
-		printf("sent %d bytes\n", ret);
+		// printf("sizeof packet data = %lu", sizeof(packet->data));
+		printf("strlen of packet data = %lu\n", strlen(packet->data));
+		int val = send(socket, packet, sizeof(char) * ret + sizeof(uint32_t), 0);
+		printf("sent %d bytes\n", val);
 		free_packet(packet);
 	}
 
